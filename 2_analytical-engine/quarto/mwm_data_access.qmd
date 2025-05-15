@@ -1,0 +1,110 @@
+---
+title: "NWM Data Access via Python"
+format: html
+jupyter: python3
+editor: source
+---
+
+```{r setup}
+# Use the Python environment you created
+reticulate::use_condaenv("nwm_env", required = TRUE)
+```
+
+
+```{r}
+library(nhdplusTools)
+
+# Alsea River at Tidewater: approx. 44.3906° N, -123.8706° W
+comid <- discover_nhdplus_id(
+  nldi_feature = list(featureSource="nwissite", featureID="USGS-14306500")
+)
+
+print(comid)
+
+```
+
+
+```{python}
+# Python setup
+import xarray as xr
+import s3fs
+import numpy as np
+
+fs = s3fs.S3FileSystem(anon=True)
+url = "s3://noaa-nwm-retrospective-2-1-zarr-pds/chrtout.zarr"
+ds = xr.open_zarr(fs.get_mapper(url), consolidated=True)
+```
+
+
+```{python}
+flow = ds["streamflow"].sel(feature_id=23886298)  # or whatever COMID you found
+```
+
+
+```{python}
+flow_subset = flow.sel(time=slice("2000-01-01", "2000-12-31")).compute()
+
+# Convert to DataFrame and save to CSV
+flow_df = flow_subset.to_dataframe().reset_index()
+flow_df.to_csv("alsea_streamflow_2000.csv", index=False)
+```
+
+```{r}
+flow_data <- read.csv("alsea_streamflow_2000.csv")
+
+# Convert time using space-separated format
+flow_data$time <- as.POSIXct(flow_data$time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
+
+# Confirm it worked
+str(flow_data$time)
+head(flow_data$time)
+
+# Plot
+plot(flow_data$time, flow_data$streamflow, type = "l",
+     col = "steelblue", xlab = "Date", ylab = "Streamflow (m³/s)",
+     main = "Alsea River (COMID 23886298) - NWM Simulated Flow (2000)")
+
+```
+
+
+
+
+
+
+
+
+
+```{python}
+gage_ids = ds["gage_id"].values
+gage_ids_str = [g.decode("utf-8") for g in gage_ids]  # this converts from b'' to str
+```
+
+```{python}
+idx = [i for i, g in enumerate(gage_ids_str) if g == "14306500"]
+
+# Check if found
+if len(idx) == 0:
+    print("Gage not found.")
+else:
+    feature_id = ds["feature_id"].values[idx[0]]
+    print("Feature ID:", feature_id)
+```
+
+
+
+
+```{python}
+gage_ids = ds["gage_id"].astype(str).values
+idx = np.where(gage_ids == "14306500")[0][0]
+feature_id = ds["feature_id"].values[idx]
+
+# Extract streamflow for that feature
+flow = ds["streamflow"].sel(feature_id=feature_id)
+
+# Optional: Limit to a time range to reduce memory use
+flow_subset = flow.sel(time=slice("2000-01-01", "2000-12-31")).compute()
+
+# Save to CSV for R to use
+flow_df = flow_subset.to_dataframe().reset_index()
+flow_df.to_csv("alsea_streamflow_2000.csv", index=False)
+```

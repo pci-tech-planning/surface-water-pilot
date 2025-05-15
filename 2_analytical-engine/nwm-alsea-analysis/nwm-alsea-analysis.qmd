@@ -1,0 +1,184 @@
+---
+title: "Alsea River Streamflow Analysis"
+format: html
+editor: visual
+jupyter: python3
+params:
+  comid: 23886298
+  gage_id: "14306500"
+---
+
+```{r setup}
+# Load required packages
+# If you haven't installed the packages yet, uncomment the next line
+# install.packages("librarian")
+
+librarian::shelf(
+  dataRetrieval,
+  dplyr,
+  ggplot2,
+  hydroTSM,
+  reticulate
+)
+
+# Loading Python environment
+reticulate::use_condaenv("nwm_env", required = TRUE)
+```
+
+
+## 📥 Python: Download and Process NWM Data
+
+```{python}
+import xarray as xr
+import s3fs
+import pandas as pd
+
+# Use the COMID parameter from Quarto
+comid = 23886298  # Replace with params if using papermill or a true parameterized run
+
+# Function to extract daily NWM flow for a given COMID
+def extract_daily_nwm(comid, start="1979-02-01", end="2020-12-31"):
+    fs = s3fs.S3FileSystem(anon=True)
+    url = "s3://noaa-nwm-retrospective-2-1-zarr-pds/chrtout.zarr"
+    ds = xr.open_zarr(fs.get_mapper(url), consolidated=True)
+    flow = ds["streamflow"].sel(feature_id=comid)
+    flow = flow.sel(time=slice(start, end)).compute()
+    df = flow.to_dataframe().reset_index()
+    df["date"] = pd.to_datetime(df["time"]).dt.date
+    daily_df = df.groupby("date")["streamflow"].mean().reset_index()
+    daily_df.to_csv("data/nwm_flow.csv", index=False)
+
+# Run the function
+extract_daily_nwm(comid)
+```
+
+## 📄 R: Load and Compare with USGS Data
+
+```{r}
+# Load NWM data
+nwm <- read.csv("data/nwm_flow.csv")
+nwm$date <- as.Date(nwm$date)
+
+# Download USGS daily streamflow
+gage_id <- "14306500"
+usgs <- readNWISdv(siteNumbers = gage_id, parameterCd = "00060",
+                   startDate = "1979-02-01", endDate = "2020-12-31")
+usgs <- renameNWISColumns(usgs)
+
+# Merge datasets
+merged <- full_join(nwm, usgs, by = c("date" = "Date"))
+```
+
+## 📈 Time Series Comparison
+
+```{r}
+ggplot(merged, aes(x = date)) +
+  geom_line(aes(y = streamflow, color = "NWM")) +
+  geom_line(aes(y = Flow, color = "USGS")) +
+  scale_y_log10() +
+  labs(y = "Streamflow (m³/s)", x = "Date",
+       title = "NWM vs USGS Streamflow: Alsea River (1979-2020)") +
+  scale_color_manual(values = c("NWM" = "steelblue", "USGS" = "darkgreen")) +
+  theme_minimal()
+```
+
+## 📉 Flow Ratio Over Time
+
+```{r}
+merged <- merged %>% mutate(ratio = streamflow / Flow)
+
+ggplot(merged, aes(x = date, y = ratio)) +
+  geom_line(color = "purple") +
+  scale_y_log10() +
+  labs(title = "NWM / USGS Streamflow Ratio", y = "Ratio", x = "Date") +
+  theme_minimal()
+```
+
+## 🔵 Scatter Plot: NWM vs USGS
+
+```{r}
+ggscatter(merged, x = "Flow", y = "streamflow",
+          add = "reg.line", conf.int = TRUE,
+          xscale = "log10", yscale = "log10",
+          xlab = "USGS Flow (m³/s)", ylab = "NWM Flow (m³/s)",
+          title = "NWM vs USGS Daily Flow",
+          color = "blue")
+```
+
+## 📊 Frequency Analysis (Annual Peak Flow)
+
+```{r}
+annual_max <- merged %>%
+  group_by(year = format(date, "%Y")) %>%
+  summarize(usgs_peak = max(Flow, na.rm = TRUE),
+            nwm_peak = max(streamflow, na.rm = TRUE))
+
+plot(annual_max$year, annual_max$nwm_peak, type = "l", col = "steelblue",
+     xlab = "Year", ylab = "Annual Peak Flow (m³/s)",
+     main = "Annual Peak Flow - NWM (blue) vs USGS (green)")
+lines(annual_max$year, annual_max$usgs_peak, col = "darkgreen")
+legend("topright", legend = c("NWM", "USGS"), col = c("steelblue", "darkgreen"), lty = 1)
+```
+## 🔁 FFT Analysis and Periodogram Comparison
+
+```{r}
+# Remove NA rows for FFT and detrend the time series
+fft_data <- merged %>% filter(!is.na(streamflow), !is.na(Flow))
+
+# Detrend and demean
+nwm_series <- ts(fft_data$streamflow)
+usgs_series <- ts(fft_data$Flow)
+
+nwm_detrend <- resid(lm(nwm_series ~ seq_along(nwm_series)))
+usgs_detrend <- resid(lm(usgs_series ~ seq_along(usgs_series)))
+
+nwm_clean <- nwm_detrend - mean(nwm_detrend)
+usgs_clean <- usgs_detrend - mean(usgs_detrend)
+
+# Compute FFT and periodograms
+nwm_fft <- abs(fft(nwm_clean))^2
+usgs_fft <- abs(fft(usgs_clean))^2
+
+# Normalize and trim to positive frequencies
+n <- length(nwm_fft)
+nwm_spec <- nwm_fft[1:(n/2)]
+usgs_spec <- usgs_fft[1:(n/2)]
+freq <- (1:(n/2)) / n
+
+# Plot
+plot(freq, nwm_spec, type = "l", col = "steelblue", log = "y",
+     xlab = "Frequency (cycles per day)", ylab = "Spectral Power",
+     main = "Periodogram: NWM (blue) vs USGS (green)")
+lines(freq, usgs_spec, col = "darkgreen")
+legend("topright", legend = c("NWM", "USGS"), col = c("steelblue", "darkgreen"), lty = 1)
+```
+```{r}
+# Use spectrum() for smoothed spectral density estimation
+nwm_spec <- spectrum(fft_data$streamflow, log = "yes", plot = FALSE)
+usgs_spec <- spectrum(fft_data$Flow, log = "yes", plot = FALSE)
+
+# Plot together
+plot(nwm_spec$freq, nwm_spec$spec, type = "l", col = "steelblue", log = "y",
+     xlab = "Frequency (cycles per day)", ylab = "Spectral Power",
+     main = "Smoothed Periodogram: NWM (blue) vs USGS (green)")
+lines(usgs_spec$freq, usgs_spec$spec, col = "darkgreen")
+legend("topright", legend = c("NWM", "USGS"), col = c("steelblue", "darkgreen"), lty = 1)
+```
+
+## 🔁 Smoothed Periodogram Comparison
+
+```{r}
+# Remove NA rows and apply spectrum-based spectral estimation
+fft_data <- merged %>% filter(!is.na(streamflow), !is.na(Flow))
+
+# Use spectrum() for smoothed spectral density estimation
+nwm_spec <- spectrum(fft_data$streamflow, log = "yes", plot = FALSE)
+usgs_spec <- spectrum(fft_data$Flow, log = "yes", plot = FALSE)
+
+# Plot
+plot(nwm_spec$freq, nwm_spec$spec, type = "l", col = "steelblue", log = "y",
+     xlab = "Frequency (cycles per day)", ylab = "Spectral Power",
+     main = "Smoothed Periodogram: NWM (blue) vs USGS (green)")
+lines(usgs_spec$freq, usgs_spec$spec, col = "darkgreen")
+legend("topright", legend = c("NWM", "USGS"), col = c("steelblue", "darkgreen"), lty = 1)
+```

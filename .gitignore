@@ -24,3 +24,5 @@ renv/lock/
 # OS-specific
 .DS_Store
 Thumbs.db
+.DS_Store
+2_analytical-engine/.DS_Store
