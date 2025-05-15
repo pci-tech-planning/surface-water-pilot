@@ -1,0 +1,83 @@
+# 📁 Data Folder Structure Guidance
+
+This document outlines how to organize the `datasets/` folder in this project to ensure data provenance, reproducibility, and collaboration across users and systems.
+
+## 📦 Folder Layout Overview
+
+```
+datasets/
+└── raw_data/
+    └── [dataset_name]/
+        ├── data/                        # Raw data files (e.g., .csv, .zip, .geojson)
+        ├── metadata/                   # Data dictionaries, citations, XML/ISO metadata
+        ├── scripts/                    # R or Python scripts for data access or prep
+        │   └── script_system_prep_rselenium.R
+        ├── [dataset_name].Rproj        # Optional RStudio project for dataset-level work
+        └── README.txt                  # Describes the dataset, source, and preparation
+```
+
+---
+
+## 🗂 Folder Descriptions
+
+### 🔹 `data/`
+- **What goes here**: Raw datasets in their original format, unprocessed.
+- **Rule**: This folder is typically **excluded from version control** using `.gitignore`.
+
+### 🔹 `metadata/`
+- **What goes here**: Supporting files that describe the dataset (e.g., citations, field definitions, attribute documentation, QA/QC info).
+- **Format**: Can be `.txt`, `.pdf`, `.xml`, or `.xlsx`.
+
+### 🔹 `scripts/`
+- **What goes here**: Any script used to access, download, transform, or prepare the data.
+- Include:
+  - Scripts for automated data downloads (`*_rselenium_download.R`)
+  - Data cleaning or formatting routines
+  - Any external API access code
+
+### 🔹 `.Rproj` (optional)
+- A dataset-specific RStudio project file, useful for focused development or inspection.
+- Helps isolate library paths, working directories, and renv environments if needed.
+
+### 🔹 `README.txt`
+- **Required**: Every dataset should include a `README.txt` file that explains:
+  - What the dataset is
+  - Source and citations (include DOI or permanent link)
+  - Description of folder contents
+  - Any modifications or preprocessing performed
+
+---
+
+## ✅ Best Practices
+
+- Keep raw and processed data **separate**—processed data should live in `data/processed/` elsewhere if needed.
+- Do **not** commit large data files to GitHub. Instead:
+  - Use `dataRetrieval` or `download.file()` in scripts
+  - Or link to shared cloud storage and explain usage in the `README.txt`
+- Include DOIs or official citations wherever possible
+- Make sure filenames are descriptive and versioned where relevant
+
+---
+
+## 📚 Example
+
+**Directory: `datasets/raw_data/enhanced_nhdplus/`**
+
+```
+README.txt                      ← Describes the USGS HRU dataset
+usgs_hru_region_17.Rproj      ← Dataset-specific RStudio project
+data/
+    Blodgett23_network_attrs.zip
+metadata/
+    usgs_geospatial_fabric.pdf
+    original_data_citation.txt
+scripts/
+    script_system_prep_rselenium.R
+    script_download_hru_region_17.R
+```
+
+---
+
+## 🤝 Contributor Note
+
+This structure was developed to support reproducible, team-based water data analysis projects. If you're adding new datasets, please follow this format and reach out with any questions or suggestions for improvement.
