@@ -1,0 +1,212 @@
+---
+title: "Reproducible Technical Assistance Package (TAP) Pipeline Guidelines"
+output: pdf_document
+date: "2025-05-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Reproducible Technical Assistance Package (TAP) Pipeline Guidelines
+
+These guidelines provide a standardized framework for developing reproducible, cross-platform TAP workflows. Follow this document to ensure consistency, maintainability, and transparency in all future TAP projects.
+
+---
+
+## 1. Introduction
+
+Delivering Technical Assistance Packages (TAPs) that run identically on any machine 
+is critical for trust, efficiency, and collaboration. This guide outlines an 
+end-to-end, container-based workflow with fallback options to guarantee 
+reproducibility and minimize environment-specific errors.
+
+## 2. Rationale
+
+- **Transparency:** Publicly verifiable workflows build stakeholder confidence.
+- **Portability:** Standardized environments remove "works on my machine" problems.
+- **Maintainability:** Automated builds and tests prevent manual drift.
+- **Scalability:** Clear patterns enable scaling from local desktops to cloud or HPC.
+- **Compliance:** Aligns with data governance and security requirements.
+
+## 3. Objectives
+
+1. Define a repeatable repository structure for code, data, and configs.
+2. Pin all dependencies via environment locks (`renv`, `requirements.txt`).
+3. Containerize the entire stack (R, Java, browser drivers).
+4. Ensure cross-platform compatibility (Windows/macOS/Linux).
+5. Implement CI pipelines for automated build and smoke tests.
+6. Provide clear documentation and minimal usage commands.
+
+## 4. Expected Features & Functionalities
+
+- **One-step build:** `docker build -t tap-demo .`
+- **One-step run:** `docker run --rm tap-demo`
+- **Native fallback:** `renv::restore()` then `Rscript scripts/run_tap.R`
+- **Config via ENV:** All credentials and URLs injected through environment variables.
+- **Healthchecks:** Container health monitored via WebDriver status endpoint.
+- **CI badge:** Green status visible in README after every commit.
+- **Sample data:** Dummy dataset (<1 MB) for offline end-to-end test.
+
+## 5. Detailed Guidelines
+
+### 5.1 Repository Structure
+
+/ ── Dockerfile
+── docker-compose.yml # Optional for multi-service setups
+── renv.lock + renv/ # R environment lock files
+── requirements.txt # Python dependencies lock
+── scripts/ # Automation scripts (e.g. run_tap.R)
+── data/ # Sample or placeholder data
+── .env.example # Template for environment variables
+── README.md # Overview and run instructions
+└─ .github/workflows/ci.yml # CI smoke-test configuration
+
+
+### 5.2 Dependency Management
+
+- **R:** Use `renv::init()` and `renv::snapshot()` to lock packages.
+- **Python:** Maintain `requirements.txt` with pinned versions.
+- **System libs:** List all needed OS packages in `apt-get install` within Dockerfile.
+
+### 5.3 Containerization
+
+1. **Base Image:** Use `rocker/r-ver:4.3.1` for R or `python:3.11` for Python.
+2. **Java:** Install OpenJDK 11 (headless) for Selenium Server.
+3. **Browser & Driver:** Install Google Chrome and matching ChromeDriver in `/usr/local/bin`.
+4. **Project Copy:** `COPY . /home/project`
+5. **Restore Environments:** Run `renv::restore()` or `pip install -r requirements.txt`.
+6. **Entrypoint:** Set `ENTRYPOINT ["Rscript","scripts/run_tap.R"]`.
+
+### 5.4 Cross-Platform Compatibility
+
+- Always use forward slashes (`/`) in file paths.
+- Provide native-mode instructions for Windows, macOS, and Linux.
+
+### 5.5 Environment Variables
+
+`.env.example` must list all required variables:
+
+- `API_KEY`
+- `DATA_URL`
+- `OUTPUT_DIR`
+
+Load these in code via a dotenv library or `Sys.getenv()`.
+
+### 5.6 Healthchecks & Reliability
+
+Include in Dockerfile:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s \\
+  CMD curl -f http://localhost:4444/status || exit 1
+```
+
+Implement retry logic when opening browser sessions in code.
+
+### 5.7 Continuous Integration (CI)
+- Use GitHub Actions or similar CI tools.
+# .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore R packages
+        run: R -e 'renv::restore(prompt=FALSE)'
+      - name: Build Docker image
+        run: docker build -t tap-demo .
+      - name: Smoke-test
+        run: |
+          docker run --rm tap-demo Rscript -e 'print("TAP OK")'
+          
+### 5.8 Documentation & Delivery
+
+README.md must include:
+-Prerequisites: Docker or Java + R/Python.
+-Three commands: clone, build, run.
+-Native fallback instructions.
+-CI badge showing current status.
+
+### 5.9 Performance & Scaling
+
+-Document that the setup has been tested on at least 4 cores and 16 GB RAM.
+-Provide instructions to adjust Docker resource limits in Docker Desktop settings.
+-Recommend migrating the same container to cloud VM or self-hosted CI runner for heavy workloads.
+
+### 5.10 Clean Shutdown & Logging
+
+-Scripts must trap interrupts and call remDr$close() and server$stop().
+-Mount a host volume for ./logs/ to persist log files outside the container.
+
+## 6. Delivery Checklist
+
+**GitHub repository** with correct layout:
+
+- `Dockerfile`
+- `docker-compose.yml` (if needed)
+- `renv.lock` and `renv/` folder
+- `scripts/` directory
+- `data/` directory
+- `.env.example`
+- `README.md`
+- `.github/workflows/ci.yml`
+
+**Dockerfile** builds successfully and installs:
+
+- OpenJDK 11+
+- Google Chrome (or Firefox)
+- Matching ChromeDriver in `/usr/local/bin`
+- System libraries (via `apt-get install`)
+- R packages (via `renv::restore()`)
+
+**docker-compose.yml** (if used) correctly configures all services, ports, and volume mounts
+
+**Environment lock file** (`renv.lock` or `requirements.txt`) restores cleanly:
+
+- `renv::restore()` for R
+- `pip install -r requirements.txt` for Python
+
+**CI pipeline** passes on push/pull requests:
+
+  - Builds the Docker image  
+  - Runs a smoke test:  
+     ```bash
+     docker run --rm tap-demo Rscript -e 'print("TAP OK")'
+     ```
+  - Displays a green badge in `README.md`  
+- Sample data (< 1 MB) included; real-data endpoints only used if environment variables are set  
+- `.env.example` lists all required environment variables with clear descriptions  
+- Healthcheck configured in `Dockerfile` and retry logic in code ensures service readiness  
+- Clean shutdown logic in scripts: catches interrupts and calls:
+  ```r
+  remDr$close()
+  server$stop()
+  ```
+- Performance/resource notes present: tested on 4 cores & 16 GB RAM; instructions 
+  to adjust CPU/RAM limits in Docker Desktop settings.
+- Native fallback validated on fresh macOS and Windows environments:
+```bash
+renv::restore() + Rscript scripts/run_tap.R
+```
+- Logs are written to a mounted host volume (`./logs/`) for persistence
+
+## 7. Conclusion
+
+By adhering to these guidelines, every Technical Assistance Package (TAP) you develop will be fully reproducible, transparent, and maintainable across any environment. Containers ensure that dependencies and system libraries are isolated, while environment locks (`renv`, `requirements.txt`) preserve exact package versions. Automated CI checks and healthchecks guarantee early detection of issues, and clear documentation empowers any team member or stakeholder to run, inspect, and extend your workflows with confidence.
+
+These practices not only reduce the “works on my machine” friction but also lay the foundation for scalable deployment—whether on local machines, cloud VMs, or high-performance compute clusters.
+
+## 8. Document Version History
+
+| Version | Date       | Description                                                              |
+| ------- | ---------- | ------------------------------------------------------------------------ |
+| 1.0     | 2025-05-14 | Initial draft covering core repository layout, containerization, and CI. |
+| 1.1     | 2025-05-15 | Added conclusion, version history, and contact section.                  |
+| 1.2     | 2025-05-16 | Updated CI pipeline details and added performance notes.                 |
+
+End of guidleines.
+
+  

@@ -1,0 +1,88 @@
+---
+title: "comid_map_Alsea"
+format: html
+---
+
+```{r setup}
+# Load packages
+
+librarian::shelf(
+  sf,
+  ggplot2,
+  dplyr
+)
+
+remotes::install_github("USGS-R/nhdplusTools", ref = "main", force = TRUE)
+
+library(nhdplusTools)
+```
+
+## 📍 Gage Coordinates and Location
+
+```{r}
+# Define the gage location
+gage_coords <- data.frame(
+  site_no = "14306500",
+  lon = -123.86639,
+  lat = 44.39056
+)
+
+gage_sf <- st_as_sf(gage_coords, coords = c("lon", "lat"), crs = 4326)
+```
+
+```{r}
+comid <- discover_nhdplus_id(point = c(-123.86639, 44.39056))
+comid
+```
+
+## 🗺️ Retrieve Flowline Geometry
+
+```{r}
+# Download flowline geometry for the identified COMID
+flowline_sf <- get_nhdplus(comids = comid, realization = "flowline")
+```
+
+## 🖼️ Plot Gage and Flowline
+
+```{r}
+ggplot() +
+  geom_sf(data = flowline_sf, color = "steelblue", size = 1) +
+  geom_sf(data = gage_sf, color = "red", size = 3) +
+  theme_minimal() +
+  labs(title = "NHDPlus Flowline and Gage Location",
+       subtitle = paste("COMID:", comid))
+```
+
+## 📝 Optional: Add Nearby Flowlines (Exploration)
+
+```{r}
+# Navigate upstream mainstem for 10 km
+nldi_out <- navigate_nldi(
+  nldi_feature = list(featureSource = "comid", featureID = comid),
+  mode = "upstreamMain",
+  distance_km = 10
+)
+
+# Get geometries for multiple upstream COMIDs
+upstream_comids <- nldi_out$UT_flowlines$identifier
+upstream_lines <- get_nhdplus(comids = upstream_comids, realization = "flowline")
+
+# Plot upstream network
+ggplot() +
+  geom_sf(data = upstream_lines, color = "darkgreen", size = 0.8) +
+  geom_sf(data = flowline_sf, color = "orange", size = 1.2) +
+  geom_sf(data = gage_sf, color = "red", size = 3) +
+  theme_minimal() +
+  labs(title = "Gage and Upstream Flowlines",
+       subtitle = paste("COMID:", comid))
+```
+
+
+## 🔍 Optional: View COMID Table
+
+```{r}
+flowlines$flowline %>%
+  select(comid, streamleve, streamorde, reachcode, lengthkm) %>%
+  arrange(desc(streamorde)) %>%
+  head(10)
+```
