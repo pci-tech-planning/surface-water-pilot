@@ -1,4 +1,26 @@
-.Rproj.user
+# Ignore renv internal folders
+renv/library/
+renv/local/
+renv/cellar/
+renv/python/
+renv/sandbox/
+renv/staging/
+renv/lock/
+
+# RStudio junk files
 .Rhistory
 .RData
-.Ruserdata
+.Rproj.user/
+
+# Quarto and knitted output (optional)
+*.html
+*.pdf
+*.docx
+*.ppt
+
+# Large datafiles
+*.zip
+
+# OS-specific
+.DS_Store
+Thumbs.db

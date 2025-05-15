@@ -1,0 +1,60 @@
+# R Project Sync & Reproducibility Checklist
+
+This checklist helps ensure your renv-based R project can be cloned, restored, and run reproducibly across machines or collaborators.
+
+## ✅ Before Syncing or Sharing
+
+1. 🔒 **Snapshot dependencies**
+   ```r
+   renv::snapshot()
+   ```
+   - Ensures your `renv.lock` is current and accurate.
+
+2. 📦 **Exclude unnecessary files**
+   - Confirm that `.gitignore` excludes:
+     - `renv/library/`
+     - `.RData`, `.Rhistory`, `.Rproj.user/`, and output files (`.html`, `.pdf`, etc.)
+
+3. 📤 **Push your GitHub repo**
+   - Include:
+     - `renv.lock`
+     - `renv/activate.R`
+     - `.Rproj`
+     - Your scripts, data, Quarto files, etc.
+
+---
+
+## 🔄 When Cloning on Another Machine
+
+1. 📁 **Clone the repo**
+   - Use GitHub Desktop or `git clone` into your working directory
+
+2. 📂 **Open the `.Rproj` file** in RStudio
+
+3. 🔄 **Restore the environment**
+   ```r
+   renv::restore()
+   ```
+   - This will install all packages listed in `renv.lock`
+
+4. 🧪 **Test the build**
+   - Run the key scripts or Quarto files to verify everything works:
+     ```r
+     source("analysis.R")
+     quarto::render("report.qmd")
+     ```
+
+---
+
+## 🧼 Optional Tips
+
+- To isolate your work from your global R setup:
+  - Avoid using global packages; always work within the project
+- If working with collaborators:
+  - Encourage them to run `renv::restore()` after cloning
+
+---
+
+## ✅ That's it!
+With this setup, your project should behave the same on any machine with R and RStudio installed.
+
