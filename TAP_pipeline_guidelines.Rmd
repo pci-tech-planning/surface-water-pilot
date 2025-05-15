@@ -1,6 +1,10 @@
 ---
 title: "Reproducible Technical Assistance Package (TAP) Pipeline Guidelines"
-output: pdf_document
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    df_print: paged
 date: "2025-05-15"
 ---
 
