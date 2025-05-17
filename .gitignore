@@ -26,3 +26,4 @@ renv/lock/
 Thumbs.db
 .DS_Store
 2_analytical-engine/.DS_Store
+renv/settings.json
