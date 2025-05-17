@@ -1,97 +1,109 @@
 # ✅ R Project Environment Setup Guide
 
-This guide outlines the standard steps for initializing a clean, reproducible R environment using `renv` in any new project.
+This guide outlines the standard steps for initializing a clean, reproducible R environment using renv in any new project.
 
----
+📁 1. Create a New R Project
+In RStudio, go to: File > New Project > New Directory
 
-## 📁 1. Create a New R Project
+Select an appropriate folder name (e.g., surface-water-pilot)
 
-- In RStudio, go to: `File > New Project > New Directory`
-- Select an appropriate folder name (e.g., `surface-water-pilot`)
-- Save it inside your working directory or GitHub repo folder
+Save it inside your working directory or GitHub repo folder
 
----
-
-## 🧱 2. Initialize renv for Dependency Management
-
+🧱 2. Initialize renv for Dependency Management
 In the R console, run:
-```r
+
+r
+Copy
 renv::init()
-```
-
 This creates:
-- A private library for your project
-- A `renv.lock` file to track package versions
-- A `renv/` folder for environment settings
 
----
+A private library for your project
 
-## 📦 3. Install Required Packages
+A renv.lock file to track package versions
 
-Use `install.packages()` or `librarian::shelf()` to install packages:
-```r
+A renv/ folder for environment settings
+
+📦 3. Install Required Packages
+Use install.packages() or librarian::shelf() to install packages:
+
+r
+Copy
 install.packages("tidyverse")
-```
 or
-```r
-librarian::shelf(tidyverse, lubridate, here)
-```
 
+r
+Copy
+librarian::shelf(tidyverse, lubridate, here)
 Packages will be installed into the project-specific library.
 
----
-
-## 🔒 4. Snapshot the Environment
-
+🔒 4. Snapshot the Environment
 Once your packages are installed, run:
-```r
+
+r
+Copy
 renv::snapshot()
-```
+This updates the renv.lock file to reflect your environment.
 
-This updates the `renv.lock` file to reflect your environment.
-
----
-
-## 🧪 5. Check Reproducibility
-
+🧪 5. Check Reproducibility
 To simulate restoring on a new machine:
-1. Clone or open the R project
-2. Run:
-   ```r
-   renv::restore()
-   ```
-This re-installs all packages listed in `renv.lock`.
 
----
+Clone or open the R project
 
-## 🌐 6. Connect to GitHub (Optional)
+Run:
 
-- Create a GitHub repo and push your project files.
-- Make sure to `.gitignore` these:
-  ```
-  renv/library/
-  .Rhistory
-  .Rproj.user/
-  ```
+r
+Copy
+renv::restore()
+This re-installs all packages listed in renv.lock.
 
----
+🔄 6. Updating the Environment and Installing Additional Packages
+If you need to install new packages during your project, use:
 
-## 📝 7. Optional: Quarto Support
+r
+Copy
+renv::install("shiny")  # Example for installing 'shiny'
+This will install the package and update the renv.lock file to reflect the change.
 
+After installing new packages, run renv::snapshot() to update the lock file with the new environment state.
+
+🌐 7. Connect to GitHub (Optional)
+Create a GitHub repo and push your project files.
+
+Make sure to .gitignore these:
+
+bash
+Copy
+renv/library/
+.Rhistory
+.Rproj.user/
+
+📝 8. Optional: Quarto Support
 If using Quarto documents:
-```r
+
+r
+Copy
 quarto::render("report.qmd")
-```
-
 Add Quarto to your project as needed using:
-```r
+
+r
+Copy
 quarto::quarto_add()
-```
 
----
+🚨 Tips
+Always run renv::snapshot() after adding or updating packages to keep the environment in sync.
 
-## 🚨 Tips
+If the environment is out-of-sync, run renv::status() to check for discrepancies.
 
-- Always run `renv::snapshot()` after adding or updating packages.
-- Commit `renv.lock` to Git—never `renv/library/`.
-- Use `here::here()` for portable file paths across systems.
+Commit renv.lock to Git—never renv/library/.
+
+If you encounter missing packages, use renv::install("package_name") to install them, and then renv::snapshot() to update the lock file.
+
+Use here::here() for portable file paths across systems.
+
+Additional Notes:
+Activating the Environment: When opening an existing project, renv should automatically activate the environment. If needed, manually activate it with:
+
+r
+Copy
+renv::activate()
+Restoring Missing Packages: If you run into issues where packages are missing after cloning or switching environments, use renv::restore() to install all dependencies listed in the renv.lock file.
